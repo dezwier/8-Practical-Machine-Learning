@@ -4,6 +4,7 @@ author: "Desiré De Waele"
 date: "16 juli 2016"
 output: 
   html_document: 
+    keep_md: yes
     theme: united
     toc: yes
 ---
