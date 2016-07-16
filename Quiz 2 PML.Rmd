@@ -1,0 +1,170 @@
+---
+title: "Untitled"
+author: "Desiré De Waele"
+date: "1 april 2016"
+output: 
+  html_document: 
+    fig_height: 12
+    fig_width: 10
+---
+
+# Question 1
+
+Load the Alzheimer's disease data using the commands:
+
+```{r, message=FALSE, warning=FALSE}
+library(caret); library(AppliedPredictiveModeling)
+data(AlzheimerDisease)
+```
+
+Which of the following commands will create non-overlapping training and test sets with about 50% of the observations assigned to each?
+
+***
+
+```{r, message=FALSE, warning=FALSE}
+adData = data.frame(diagnosis,predictors)
+trainIndex = createDataPartition(diagnosis, p = 0.50,list=FALSE)
+training = adData[trainIndex,]
+testing = adData[-trainIndex,]
+```
+
+# Question 2
+Load the cement data using the commands:
+
+```{r, message=FALSE, warning=FALSE}
+library(AppliedPredictiveModeling)
+data(concrete)
+library(caret)
+set.seed(1000)
+inTrain = createDataPartition(mixtures$CompressiveStrength, p = 3/4)[[1]]
+training = mixtures[ inTrain,]
+testing = mixtures[-inTrain,]
+```
+
+Make a plot of the outcome (CompressiveStrength) versus the index of the samples. Color by each of the variables in the data set (you may find the cut2() function in the Hmisc package useful for turning continuous covariates into factors). What do you notice in these plots?
+
+***
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr); library(Hmisc); library(gridExtra)
+training <- mutate(training, index=1:nrow(training))
+
+g1 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$Cement, g=5)) +
+        scale_colour_brewer(name = "Cement")
+g2 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$BlastFurnaceSlag, g=5)) +
+        scale_colour_brewer(name = "BlastFurnaceSlag")
+g3 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$FlyAsh, g=5)) +
+        scale_colour_brewer(name = "FlyAsh")
+g4 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$Water, g=5)) +
+        scale_colour_brewer(name = "Water")
+g5 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$Superplasticizer, g=5)) +
+        scale_colour_brewer(name = "Superplasticizer")
+g6 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$CoarseAggregate, g=5)) +
+        scale_colour_brewer(name = "CoarseAggregate")
+g7 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$FineAggregate, g=5)) +
+        scale_colour_brewer(name = "FineAggregate")
+g8 <- qplot(index, CompressiveStrength, data=training, color=cut2(training$Age, g=5)) +
+        scale_colour_brewer(name = "Age")
+
+grid.arrange(g1, g2, g3, g4, g5, g6, g7, g8, ncol=2)
+
+```
+
+* **There is a non-random pattern in the plot of the outcome versus index that does not appear to be perfectly explained by any predictor suggesting a variable may be missing.**
+* There is a non-random pattern in the plot of the outcome versus index that is perfectly explained by the Age variable so there may be a variable missing.
+* There is a non-random pattern in the plot of the outcome versus index.
+* There is a non-random pattern in the plot of the outcome versus index that is perfectly explained by the FlyAsh variable so there may be a variable missing.
+
+#Question 3
+
+Load the cement data using the commands:
+
+```{r}
+library(AppliedPredictiveModeling)
+data(concrete)
+library(caret)
+set.seed(1000)
+inTrain = createDataPartition(mixtures$CompressiveStrength, p = 3/4)[[1]]
+training = mixtures[ inTrain,]
+testing = mixtures[-inTrain,]
+```
+Make a histogram and confirm the SuperPlasticizer variable is skewed. Normally you might use the log transform to try to make the data more symmetric. Why would that be a poor choice for this variable?
+
+***
+
+```{r, message=FALSE, warning=FALSE, fig.height=4}
+g1 <- ggplot(data=training, aes(x=Superplasticizer)) + geom_histogram()
+g2 <- ggplot(data=training, aes(x=log(Superplasticizer+1))) + geom_histogram()
+grid.arrange(g1, g2, ncol=2)
+```
+
+* The SuperPlasticizer data include negative values so the log transform can not be performed.
+* **There are a large number of values that are the same and even if you took the log(SuperPlasticizer + 1) they would still all be identical so the distribution would not be symmetric.**
+* The log transform does not reduce the skewness of the non-zero values of SuperPlasticizer
+* The log transform is not a monotone transformation of the data.
+
+#Question 4
+Load the Alzheimer's disease data using the commands:
+
+```{r}
+library(caret)
+library(AppliedPredictiveModeling)
+set.seed(3433)
+data(AlzheimerDisease)
+adData = data.frame(diagnosis,predictors)
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+training = adData[ inTrain,]
+testing = adData[-inTrain,]
+```
+
+Find all the predictor variables in the training set that begin with IL. Perform principal components on these variables with the preProcess() function from the caret package. Calculate the number of principal components needed to capture 90% of the variance. How many are there?
+
+***
+
+```{r}
+onlyILs <- select(training, grep('^IL', x = names(training)))
+preProc <- preProcess(onlyILs, method='pca', thresh=0.9, outcome=training$diagnosis)
+preProc
+```
+
+* 10
+* **9**
+* 12
+* 5
+
+#Question 5
+
+```{r}
+library(caret)
+library(AppliedPredictiveModeling)
+set.seed(3433)
+data(AlzheimerDisease)
+adData = data.frame(diagnosis,predictors)
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+training = adData[ inTrain,]
+testing = adData[-inTrain,]
+```
+
+Create a training data set consisting of only the predictors with variable names beginning with IL and the diagnosis. Build two predictive models, one using the predictors as they are and one using PCA with principal components explaining 80% of the variance in the predictors. Use method="glm" in the train function.
+
+What is the accuracy of each method in the test set? Which is more accurate?
+
+***
+
+```{r}
+trainingIL <- select(training, diagnosis, grep('^IL', x = names(training)))
+testingIL <- select(testing, diagnosis, grep('^IL', x = names(testing)))
+
+NonPCA <- train(diagnosis ~ ., data = trainingIL, method = "glm")
+confusionMatrix(testingIL$diagnosis, predict(NonPCA, testingIL))
+
+PCA <- train(diagnosis ~ ., data=trainingIL, method="glm", preProcess="pca", 
+             trControl=trainControl(preProcOptions=list(thresh=0.8)))
+confusionMatrix(testingIL$diagnosis, predict(PCA, testingIL))
+```
+
+* **Non-PCA Accuracy: 0.65, PCA Accuracy: 0.72**
+* Non-PCA Accuracy: 0.72, PCA Accuracy: 0.71
+* Non-PCA Accuracy: 0.72, PCA Accuracy: 0.65
+* Non-PCA Accuracy: 0.74, PCA Accuracy: 0.74
+

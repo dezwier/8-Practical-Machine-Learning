@@ -1,0 +1,151 @@
+---
+title: "Machine Learning"
+author: "Desiré De Waele"
+date: "15 juli 2016"
+output: html_document
+---
+# Import Packages
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+library(ElemStatLearn)
+library(caret)
+library(AppliedPredictiveModeling)
+library(caret)
+library(forecast)
+library(lubridate)
+library(e1071)
+```
+
+# Question 1
+Load the vowel.train and vowel.test data sets from the ElemStatLearn package.
+
+Fit (1) a random forest predictor relating the factor variable y to the remaining variables and (2) a boosted predictor using the "gbm" method. Fit these both with the train() command in the caret package.
+
+What are the accuracies for the two approaches on the test data set? What is the accuracy among the test set samples where the two methods agree?
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+data(vowel.train)
+data(vowel.test) 
+
+# Change target to factor variable
+vowel.train$y = factor(vowel.train$y)
+vowel.test$y = factor(vowel.test$y)
+
+# Train two models, with random forests and boosting
+set.seed(33833)
+model_tree = train(y ~ ., data = vowel.train, method = 'rf',verbose=FALSE)
+model_gbm = train(y ~ ., data = vowel.train, method = 'gbm',verbose=FALSE)
+
+#Get predictions
+pred_tree = predict(model_tree, vowel.test)
+pred_gbm = predict(model_gbm, vowel.test)
+
+# Get the accuracies
+tree_accuracy = sum(pred_tree == vowel.test$y) / length(pred_tree)
+gbm_accuracy = sum(pred_gbm == vowel.test$y) / length(pred_tree)
+
+# Get the combined accuracy
+agreeSub = vowel.test[pred_tree == pred_gbm,]
+pred_comb = predict(model_tree, agreeSub)
+comb_accuracy = sum(pred_comb == agreeSub$y) / length(pred_comb)
+
+table(tree_accuracy, gbm_accuracy, comb_accuracy)
+```
+
+# Question 2
+Load the Alzheimer's data, set the seed to 62433 and predict diagnosis with all the other variables using a random forest ("rf"), boosted trees ("gbm") and linear discriminant analysis ("lda") model. Stack the predictions together using random forests ("rf"). What is the resulting accuracy on the test set? Is it better or worse than each of the individual predictions?
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+# Load the data, create partitions
+data(AlzheimerDisease)
+adData = data.frame(diagnosis,predictors)
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+training = adData[ inTrain,]
+testing = adData[-inTrain,]
+
+# Build three models with random forest, boosting and linear discriminant analysis
+set.seed(62433)
+model_rf = train(diagnosis ~ ., method = 'rf', data = training, verbose=FALSE)
+model_gbm = train(diagnosis ~ ., method = 'gbm', data = training, verbose=FALSE)
+model_lda = train(diagnosis ~ ., method = 'lda', data = training, verbose=FALSE)
+
+# Get predictions on training data
+pred_rf = predict(model_rf, training)
+pred_gbm = predict(model_gbm, training)
+pred_lda = predict(model_lda, training)
+
+# Build a model with these predictions as predictors
+comb_data = data.frame(rf = pred_rf, gbm = pred_gbm, lda = pred_lda, diagnosis = training$diagnosis)
+model_comb = train(diagnosis ~ ., method = 'rf', data = comb_data, verbose=FALSE)
+
+# Get predicitons on test data
+pred_rf_test = predict(model_rf, testing)
+pred_gbm_test = predict(model_gbm, testing)
+pred_lda_test = predict(model_lda, testing)
+comb_data_test = data.frame(rf = pred_rf_test, gbm = pred_gbm_test, lda = pred_lda_test, diagnosis = testing$diagnosis)
+pred_comb_test = predict(model_comb, comb_data_test)
+
+# Compute accuracies
+accuracy_rf = sum(pred_rf_test == testing$diagnosis) / length(pred_rf_test)
+accuracy_gbm = sum(pred_gbm_test == testing$diagnosis) / length(pred_gbm_test)
+accuracy_lda = sum(pred_lda_test == testing$diagnosis) / length(pred_lda_test)
+accuracy_comb = sum(pred_comb_test == comb_data_test$diagnosis) / length(pred_comb_test)
+
+table(accuracy_rf, accuracy_gbm, accuracy_lda, accuracy_comb)
+```
+
+# Question 3
+Load the concrete data. Set the seed to 233 and fit a lasso model to predict Compressive Strength. Which variable is the last coefficient to be set to zero as the penalty increases?
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+# Load data, create partitions
+set.seed(3523)
+data(concrete)
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+training = concrete[ inTrain,]
+testing = concrete[-inTrain,]
+
+# Build model, plot coefficient paths
+set.seed(233)
+model = train(CompressiveStrength ~ ., method = 'lasso', data = training)
+plot(model$finalModel)
+```
+
+# Question 4
+Load the data on the number of visitors to the instructors blog from here: https://d396qusza40orc.cloudfront.net/predmachlearn/gaData.csv
+
+Fit a model using the bats() function in the forecast package to the training time series. Then forecast this model for the remaining time points. For how many of the testing points is the true value within the 95% prediction interval bounds?
+
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+# Load data, create partitions
+dat = read.csv("gaData.csv")
+training = dat[year(dat$date) == 2011,]
+tstrain = ts(training$visitsTumblr)
+
+remdata = dat[year(dat$date) > 2011,]
+tsrem = ts(remdata$visitsTumblr)
+
+# Build model, get predicitons & accuracy
+model = bats(tstrain)
+pred <- forecast(model, h=length(tsrem),level=c(95))
+accuracy(pred, remdata$visitsTumblr)
+acc = sum(remdata$visitsTumblr <= pred$upper) / nrow(remdata)
+print(acc)
+```
+
+# Question 5
+Load the concrete data. Set the seed to 325 and fit a support vector machine using the e1071 package to predict Compressive Strength using the default settings. Predict on the testing set. What is the RMSE?
+```{r, warning=FALSE, message=FALSE, cache=TRUE}
+# Load data, create partitions
+set.seed(3523)
+data(concrete)
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+training = concrete[ inTrain,]
+testing = concrete[-inTrain,]
+
+# Build a model, get predictions and RMSE
+set.seed(325)
+model = svm(CompressiveStrength ~ ., data = training)
+pred = predict(model, testing)
+RMSE = sqrt(sum((pred - testing$CompressiveStrength)^2))
+
+print(RMSE)
+```
+
+
